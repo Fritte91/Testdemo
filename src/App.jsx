@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { initLiff, isLoggedIn, getProfile } from './lib/liffAuth'
+import { supabase } from './lib/supabase'
 import {
   tenantBootstrap,
   ensureProfileAndCustomer,
   availabilitySearch,
   createHold,
   confirmBooking,
-  paymentInit,
-  listServices,
-  listStaff
+  paymentInit
 } from './lib/api'
 import { StatusBar } from './components/StatusBar'
 import { JsonPanel } from './components/JsonPanel'
@@ -21,7 +20,7 @@ function App() {
   const [loading, setLoading] = useState(true)
 
   // Tenant
-  const [tenantSlug] = useState(import.meta.env.VITE_TENANT_SLUG || 'demo')
+  const [tenantSlug, setTenantSlug] = useState(import.meta.env.VITE_TENANT_SLUG || 'demo-salon')
   const [tenant, setTenant] = useState(null)
   const [profileSetup, setProfileSetup] = useState(false)
 
@@ -72,11 +71,14 @@ function App() {
 
         // Auto-load tenant
         await loadTenant()
+        
+        // Wait a bit for tenant to load
+        await new Promise(resolve => setTimeout(resolve, 500))
 
         // Auto-setup profile
         await setupProfile()
 
-        // Load services and staff
+        // Load services and staff (after tenant is loaded)
         await loadServicesAndStaff()
       } catch (error) {
         console.error('Initialization error:', error)
@@ -147,23 +149,34 @@ function App() {
   }
 
   const loadServicesAndStaff = async () => {
-    if (!profileSetup) return
+    if (!tenant) return
     
     setLoadingServices(true)
     try {
-      // Try to load services and staff
-      // Note: These functions may not exist yet - backend needs to implement them
-      const [servicesRes, staffRes] = await Promise.allSettled([
-        listServices({ slug: tenantSlug }),
-        listStaff({ slug: tenantSlug })
-      ])
+      // Query services directly from Supabase
+      const { data: servicesData, error: servicesError } = await supabase
+        .from('services')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .order('name')
 
-      if (servicesRes.status === 'fulfilled' && servicesRes.value.data) {
-        setServices(servicesRes.value.data.services || servicesRes.value.data || [])
+      if (servicesError) {
+        console.error('Error loading services:', servicesError)
+      } else if (servicesData) {
+        setServices(servicesData)
       }
 
-      if (staffRes.status === 'fulfilled' && staffRes.value.data) {
-        setStaff(staffRes.value.data.staff || staffRes.value.data || [])
+      // Query staff directly from Supabase
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .order('name')
+
+      if (staffError) {
+        console.error('Error loading staff:', staffError)
+      } else if (staffData) {
+        setStaff(staffData)
       }
     } catch (error) {
       console.error('Error loading services/staff:', error)
@@ -303,8 +316,46 @@ function App() {
         />
         {tenant && (
           <div className="info-box" style={{ marginTop: '10px', marginBottom: '10px' }}>
-            <strong>Tenant:</strong> {tenant.name} ({tenant.slug})
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+              <div>
+                <strong>Tenant:</strong> {tenant.name} ({tenant.slug})
+                <div style={{ fontSize: '0.85em', color: '#666', marginTop: '5px' }}>
+                  ID: {tenant.id}
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  const newSlug = prompt('Enter tenant slug:', tenantSlug)
+                  if (newSlug && newSlug !== tenantSlug) {
+                    setTenantSlug(newSlug)
+                    setTenant(null)
+                    setServices([])
+                    setStaff([])
+                    setProfileSetup(false)
+                    loadTenant().then(() => {
+                      setTimeout(() => {
+                        setupProfile()
+                        loadServicesAndStaff()
+                      }, 500)
+                    })
+                  }
+                }}
+                style={{ 
+                  padding: '5px 10px', 
+                  fontSize: '0.85em', 
+                  background: '#6c757d', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Change
+              </button>
+            </div>
             {profileSetup && <span style={{ marginLeft: '10px', color: '#28a745' }}>✓ Profile Ready</span>}
+            {services.length > 0 && <span style={{ marginLeft: '10px', color: '#28a745' }}>✓ {services.length} Services</span>}
+            {staff.length > 0 && <span style={{ marginLeft: '10px', color: '#28a745' }}>✓ {staff.length} Staff</span>}
           </div>
         )}
         {authError && (
