@@ -71,15 +71,6 @@ function App() {
 
         // Auto-load tenant
         await loadTenant()
-        
-        // Wait a bit for tenant to load
-        await new Promise(resolve => setTimeout(resolve, 500))
-
-        // Auto-setup profile
-        await setupProfile()
-
-        // Load services and staff (after tenant is loaded)
-        await loadServicesAndStaff()
       } catch (error) {
         console.error('Initialization error:', error)
         setAuthError(`Initialization error: ${error.message}`)
@@ -90,6 +81,16 @@ function App() {
 
     initialize()
   }, [])
+
+  // Load profile and services after tenant is loaded
+  useEffect(() => {
+    if (tenant && tenant.id) {
+      console.log('[useEffect] Tenant loaded, setting up profile and loading services')
+      setupProfile().then(() => {
+        loadServicesAndStaff()
+      })
+    }
+  }, [tenant])
 
   // Auto-set date range (next 7 days)
   useEffect(() => {
@@ -120,16 +121,32 @@ function App() {
 
   const loadTenant = async () => {
     try {
+      console.log('[loadTenant] Loading tenant with slug:', tenantSlug)
       const { data, error } = await tenantBootstrap({ slug: tenantSlug, name: tenantSlug })
+      
+      console.log('[loadTenant] Response:', { data, error })
+      
       if (error) {
         console.error('Failed to load tenant:', error)
+        alert(`Failed to load tenant "${tenantSlug}": ${error.message || JSON.stringify(error)}\n\nCheck that tenant_bootstrap Edge Function is working.`)
         return
       }
+      
+      // Handle different response formats
       if (data?.tenant) {
+        console.log('[loadTenant] Tenant loaded:', data.tenant)
         setTenant(data.tenant)
+      } else if (data && typeof data === 'object' && data.id) {
+        // Sometimes the response is the tenant directly
+        console.log('[loadTenant] Tenant loaded (direct):', data)
+        setTenant(data)
+      } else {
+        console.error('[loadTenant] Unexpected response format:', data)
+        alert(`Tenant loaded but unexpected format. Check console for details.`)
       }
     } catch (error) {
       console.error('Error loading tenant:', error)
+      alert(`Error loading tenant: ${error.message}`)
     }
   }
 
@@ -361,19 +378,33 @@ function App() {
           liffStatus={liffStatus}
           lineProfile={lineProfile}
         />
+        {!tenant && (
+          <div className="error-banner" style={{ marginTop: '10px', marginBottom: '10px' }}>
+            <strong>⚠️ Tenant Not Loaded</strong>
+            <p>Current slug: {tenantSlug}</p>
+            <p>Check browser console (F12) for errors. The tenant_bootstrap Edge Function may be failing.</p>
+            <button 
+              onClick={loadTenant}
+              className="action-btn"
+              style={{ marginTop: '10px' }}
+            >
+              🔄 Retry Load Tenant
+            </button>
+          </div>
+        )}
         {tenant && (
           <div className="info-box" style={{ marginTop: '10px', marginBottom: '10px' }}>
             <div style={{ marginBottom: '10px' }}>
-              <strong>Tenant:</strong> {tenant.name} ({tenant.slug})
+              <strong>Tenant:</strong> {tenant.name || 'N/A'} ({tenant.slug || 'N/A'})
               <div style={{ fontSize: '0.85em', color: '#666', marginTop: '5px' }}>
-                ID: {tenant.id}
+                ID: {tenant.id || 'N/A'}
               </div>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {profileSetup && <span style={{ color: '#28a745', background: '#d4edda', padding: '4px 8px', borderRadius: '4px' }}>✓ Profile Ready</span>}
               {loadingServices && <span style={{ color: '#856404', background: '#fff3cd', padding: '4px 8px', borderRadius: '4px' }}>⏳ Loading...</span>}
               {!loadingServices && services.length > 0 && <span style={{ color: '#28a745', background: '#d4edda', padding: '4px 8px', borderRadius: '4px' }}>✓ {services.length} Services</span>}
-              {!loadingServices && services.length === 0 && <span style={{ color: '#721c24', background: '#f8d7da', padding: '4px 8px', borderRadius: '4px' }}>⚠️ 0 Services (Check RLS)</span>}
+              {!loadingServices && services.length === 0 && tenant && <span style={{ color: '#721c24', background: '#f8d7da', padding: '4px 8px', borderRadius: '4px' }}>⚠️ 0 Services (Check RLS or tenant_id)</span>}
               {!loadingServices && staff.length > 0 && <span style={{ color: '#28a745', background: '#d4edda', padding: '4px 8px', borderRadius: '4px' }}>✓ {staff.length} Staff</span>}
             </div>
           </div>
