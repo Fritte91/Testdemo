@@ -72,8 +72,9 @@ function App() {
         // Check token expiration BEFORE loading tenant
         const token = getIdToken()
         if (token && isTokenExpired(token)) {
-          console.log('[App] Token expired on init, redirecting to login...')
-          // Don't set loading to false - let redirect happen
+          console.log('[App] Token expired on init, showing error instead of redirecting')
+          setAuthError('Token expired. Please click "Refresh Page" button below to get a new token.')
+          setLoading(false)
           return
         }
 
@@ -463,6 +464,23 @@ function App() {
         {authError && (
           <div className="error-banner">
             <strong>Error:</strong> {authError}
+            {(authError.includes('expired') || authError.includes('Token')) && (
+              <button 
+                onClick={() => window.location.reload()} 
+                style={{ 
+                  marginLeft: '10px', 
+                  padding: '5px 15px', 
+                  backgroundColor: '#fff', 
+                  color: '#721c24',
+                  border: '1px solid #721c24',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Refresh Page
+              </button>
+            )}
           </div>
         )}
       </header>
