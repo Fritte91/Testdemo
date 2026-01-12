@@ -3,9 +3,14 @@ import liff from '@line/liff';
 import { getIdToken, isLoggedIn } from './liffAuth';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL) {
   throw new Error("Missing VITE_SUPABASE_URL in environment variables");
+}
+
+if (!SUPABASE_ANON_KEY) {
+  throw new Error("Missing VITE_SUPABASE_ANON_KEY in environment variables");
 }
 
 // Edge Functions base URL
@@ -60,8 +65,10 @@ export async function callFunction(
   opts = { auth: true }
 ) {
   try {
+    // Always include apikey header (required by Supabase Edge Functions)
     const headers = {
       "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY, // Always required
     };
 
     // Try to get fresh token if available
@@ -77,18 +84,21 @@ export async function callFunction(
       }
     }
 
-    // If auth is required, ensure we have a token
+    // Set Authorization header based on endpoint type
     if (opts.auth !== false) {
+      // Authenticated endpoint: use LINE ID token
       if (!token) {
         throw new Error("Missing LIFF idToken. Please ensure you're logged in through LINE LIFF.");
       }
-      // Try both header formats - some backends expect x-line-id-token
-      headers["Authorization"] = `Bearer ${token}`;
-      headers["x-line-id-token"] = token;
-    } else if (token) {
-      // Even for public endpoints, send token if available (both formats)
-      headers["Authorization"] = `Bearer ${token}`;
-      headers["x-line-id-token"] = token;
+      headers["Authorization"] = `Bearer ${token}`; // LINE ID token for auth endpoints
+      headers["x-line-id-token"] = token; // Also send as custom header
+    } else {
+      // Public endpoint: use anon key for Authorization
+      headers["Authorization"] = `Bearer ${SUPABASE_ANON_KEY}`; // Anon key for public endpoints
+      // Optionally include LINE token if available (for logging/analytics)
+      if (token) {
+        headers["x-line-id-token"] = token;
+      }
     }
 
     const url = `${BASE}/${functionName}`;
@@ -98,11 +108,28 @@ export async function callFunction(
       console.log(`[API] Calling ${functionName} with token: ${token.substring(0, 20)}...`);
     }
     
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body ?? {}),
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body ?? {}),
+        // Add credentials for CORS if needed
+        mode: 'cors',
+        credentials: 'omit',
+      });
+    } catch (fetchError) {
+      // Network error - likely CORS or connection issue
+      console.error(`[API] Fetch error for ${functionName}:`, fetchError);
+      return { 
+        data: null, 
+        error: { 
+          message: `Network error: ${fetchError.message}. Check CORS configuration on backend.`,
+          type: 'network_error'
+        }, 
+        status: 0 
+      };
+    }
 
     const payload = await safeJson(res);
 
