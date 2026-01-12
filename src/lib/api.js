@@ -1,6 +1,6 @@
 // src/lib/api.js
 import liff from '@line/liff';
-import { getIdToken, isLoggedIn } from './liffAuth';
+import { getIdToken, isLoggedIn, isTokenExpired, getFreshToken } from './liffAuth';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -25,34 +25,7 @@ async function safeJson(res) {
   }
 }
 
-// Helper: Get fresh token (refresh if needed)
-async function getFreshToken() {
-  if (!isLoggedIn()) {
-    throw new Error("LIFF is not logged in. Please ensure you're accessing this app through LINE LIFF.");
-  }
-  
-  // Try to get a fresh token - LIFF tokens can expire
-  let token = null;
-  try {
-    // Check if we can get a fresh token
-    if (liff.isLoggedIn && liff.isLoggedIn()) {
-      token = liff.getIDToken();
-    }
-  } catch (e) {
-    console.warn('Error getting fresh token:', e);
-  }
-  
-  if (!token) {
-    // Fallback to getIdToken helper
-    token = getIdToken();
-  }
-  
-  if (!token) {
-    throw new Error("Missing LIFF idToken. Are you logged in inside LIFF?");
-  }
-  
-  return token;
-}
+// Helper: Get fresh token (refresh if needed) - uses getFreshToken from liffAuth
 
 /**
  * Call an Edge Function with LIFF Bearer token (LINE id_token)
@@ -75,7 +48,19 @@ export async function callFunction(
     let token = null;
     try {
       if (isLoggedIn()) {
-        token = await getFreshToken();
+        // Check current token expiration
+        const currentToken = getIdToken();
+        if (currentToken && isTokenExpired(currentToken)) {
+          console.log('[API] Token expired, getting fresh token...');
+          // Get fresh token (may redirect if login needed)
+          token = await getFreshToken();
+          if (!token) {
+            // Redirect happened, return early
+            return { data: null, error: { message: 'Redirecting to LINE login for token refresh' }, status: 0 };
+          }
+        } else {
+          token = currentToken;
+        }
       }
     } catch (e) {
       // Token not available, will handle below
@@ -140,6 +125,70 @@ export async function callFunction(
     const payload = await safeJson(res);
 
     if (!res.ok) {
+      // Check if it's a token expiration error
+      const errorMsg = payload?.error || payload?.message || payload?.msg || payload?.error?.message || '';
+      const isExpiredError = res.status === 401 && (
+        errorMsg.includes('expired') || 
+        errorMsg.includes('Invalid JWT') ||
+        errorMsg.toLowerCase().includes('token')
+      );
+
+      // If token expired and we haven't retried, try to refresh and retry once
+      if (isExpiredError && opts.auth !== false && token) {
+        console.log('[API] Token expired error detected:', errorMsg);
+        console.log('[API] Attempting to refresh token and retry...');
+        
+        try {
+          // Get fresh token (may redirect if login needed)
+          const freshToken = await getFreshToken();
+          
+          if (!freshToken) {
+            // Redirect happened, return early
+            return { 
+              data: null, 
+              error: { 
+                message: 'Token expired. Redirecting to LINE login. Please try again after logging in.',
+                type: 'token_expired_redirect'
+              }, 
+              status: 401 
+            };
+          }
+          
+          if (freshToken !== token) {
+            console.log('[API] Got fresh token, retrying request...');
+            
+            // Update headers with fresh token
+            headers["Authorization"] = `Bearer ${freshToken}`;
+            headers["x-line-id-token"] = freshToken;
+            
+            // Retry the request
+            const retryRes = await fetch(url, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(body ?? {}),
+              mode: 'cors',
+              credentials: 'omit',
+            });
+            
+            const retryPayload = await safeJson(retryRes);
+            
+            if (retryRes.ok) {
+              console.log('[API] Retry successful with fresh token');
+              return { data: retryPayload ?? null, error: null, status: retryRes.status };
+            }
+            
+            // If retry also failed, return the error
+            const retryMsg = retryPayload?.error || retryPayload?.message || retryPayload?.msg || retryPayload?.error?.message || JSON.stringify(retryPayload) || `HTTP ${retryRes.status}`;
+            return { data: null, error: { message: retryMsg, raw: retryPayload }, status: retryRes.status };
+          } else {
+            console.warn('[API] Got same token after refresh attempt');
+          }
+        } catch (refreshError) {
+          console.error('[API] Failed to refresh token:', refreshError);
+          // Continue to return original error
+        }
+      }
+      
       // normalize error shape
       const msg =
         payload?.error ||

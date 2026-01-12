@@ -43,6 +43,65 @@ export function getIdToken() {
 }
 
 /**
+ * Check if token is expired or about to expire (within 5 minutes)
+ */
+export function isTokenExpired(token) {
+  if (!token) return true
+  
+  try {
+    // Decode JWT payload (second part of token)
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    
+    const payload = JSON.parse(atob(parts[1]))
+    const exp = payload.exp
+    if (!exp) return true
+    
+    const now = Math.floor(Date.now() / 1000)
+    // Check if expired or expires in less than 5 minutes
+    return exp < (now + 300)
+  } catch (error) {
+    console.error('Error checking token expiration:', error)
+    return true // If can't parse, assume expired
+  }
+}
+
+/**
+ * Get fresh token, refreshing LINE login if needed
+ * Note: LINE tokens cannot be refreshed - must re-login if expired
+ */
+export async function getFreshToken() {
+  if (!liffInitialized) {
+    throw new Error('LIFF not initialized')
+  }
+  
+  if (!liff.isLoggedIn()) {
+    // Not logged in, redirect to login
+    console.log('[liffAuth] Not logged in, redirecting to LINE login...')
+    liff.login({ redirectUri: window.location.href })
+    return null // Will redirect away
+  }
+  
+  let token = getIdToken()
+  
+  // Check if token is expired or about to expire
+  if (!token || isTokenExpired(token)) {
+    console.log('[liffAuth] Token expired or about to expire, redirecting to LINE login...')
+    console.log('[liffAuth] Token expiration check:', token ? {
+      expired: isTokenExpired(token),
+      tokenPreview: token.substring(0, 50) + '...'
+    } : 'No token')
+    
+    // LINE tokens cannot be refreshed - must re-login
+    // Redirect to LINE login to get a fresh token
+    liff.login({ redirectUri: window.location.href })
+    return null // Will redirect away
+  }
+  
+  return token
+}
+
+/**
  * Get the LINE user profile
  */
 export async function getProfile() {
