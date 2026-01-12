@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { initLiff, isLoggedIn } from './lib/liffAuth'
-import { supabase } from './lib/supabase'
+import { initLiff, isLoggedIn, getProfile } from './lib/liffAuth'
 import {
   tenantBootstrap,
   ensureProfileAndCustomer,
@@ -15,8 +14,7 @@ import './index.css'
 
 function App() {
   const [liffStatus, setLiffStatus] = useState(false)
-  const [supabaseUser, setSupabaseUser] = useState(null)
-  const [supabaseSession, setSupabaseSession] = useState(false)
+  const [lineProfile, setLineProfile] = useState(null)
   const [authError, setAuthError] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -49,7 +47,7 @@ function App() {
   // Payment
   const [paymentResult, setPaymentResult] = useState(null)
 
-  // Initialize LIFF and Supabase auth
+  // Initialize LIFF only
   useEffect(() => {
     async function initialize() {
       try {
@@ -65,55 +63,15 @@ function App() {
 
         setLiffStatus(true)
 
-        // Check for existing Supabase session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-        if (sessionError) {
-          setAuthError(`Session check error: ${sessionError.message}`)
-          setLoading(false)
-          return
+        // Get LINE profile
+        const profile = await getProfile()
+        if (profile) {
+          setLineProfile(profile)
         }
-
-        if (session?.user) {
-          // Session already exists
-          setSupabaseUser(session.user.id)
-          setSupabaseSession(true)
-          setLoading(false)
-        } else {
-          // No session, initiate OAuth flow
-          const origin = window.location.origin
-          const redirectTo = `${origin}/auth/callback`
-
-          const { error: oauthError } = await supabase.auth.signInWithOAuth({
-            provider: 'line',
-            options: {
-              redirectTo: redirectTo
-            }
-          })
-
-          if (oauthError) {
-            setAuthError(`OAuth error: ${oauthError.message}`)
-            setLoading(false)
-            return
-          }
-
-          // OAuth will redirect away, so we don't set loading to false here
-          // The redirect will happen automatically
-        }
-
-        // Set up session listener for future auth state changes
-        supabase.auth.onAuthStateChange((event, session) => {
-          if (session?.user) {
-            setSupabaseUser(session.user.id)
-            setSupabaseSession(true)
-          } else {
-            setSupabaseUser(null)
-            setSupabaseSession(false)
-          }
-        })
       } catch (error) {
         console.error('Initialization error:', error)
         setAuthError(`Initialization error: ${error.message}`)
+      } finally {
         setLoading(false)
       }
     }
@@ -243,7 +201,7 @@ function App() {
   if (loading) {
     return (
       <div className="app">
-        <div className="loading">Initializing...</div>
+        <div className="loading">Initializing LIFF...</div>
       </div>
     )
   }
@@ -254,12 +212,11 @@ function App() {
         <h1>LIFF Backend Tester</h1>
         <StatusBar 
           liffStatus={liffStatus}
-          supabaseUser={supabaseUser}
-          supabaseSession={supabaseSession}
+          lineProfile={lineProfile}
         />
         {authError && (
           <div className="error-banner">
-            <strong>Authentication Error:</strong> {authError}
+            <strong>Error:</strong> {authError}
           </div>
         )}
       </header>

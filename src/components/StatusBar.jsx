@@ -1,4 +1,4 @@
-export function StatusBar({ liffStatus, supabaseUser, supabaseSession }) {
+export function StatusBar({ liffStatus, lineProfile }) {
   return (
     <div className="status-bar">
       <div className="status-item">
@@ -7,18 +7,22 @@ export function StatusBar({ liffStatus, supabaseUser, supabaseSession }) {
           {liffStatus ? '✓ Logged In' : '✗ Not Logged In'}
         </span>
       </div>
-      <div className="status-item">
-        <span className="status-label">Supabase Session:</span>
-        <span className={`status-value ${supabaseSession ? 'success' : 'error'}`}>
-          {supabaseSession ? '✓ Active' : '✗ No Session'}
-        </span>
-      </div>
-      <div className="status-item">
-        <span className="status-label">User ID:</span>
-        <span className="status-value">
-          {supabaseUser || 'N/A'}
-        </span>
-      </div>
+      {lineProfile && (
+        <>
+          <div className="status-item">
+            <span className="status-label">LINE User:</span>
+            <span className="status-value">
+              {lineProfile.displayName || 'N/A'}
+            </span>
+          </div>
+          <div className="status-item">
+            <span className="status-label">User ID:</span>
+            <span className="status-value">
+              {lineProfile.userId || 'N/A'}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
