@@ -1,10 +1,20 @@
+import { getIdToken } from '../lib/liffAuth'
+
 export function StatusBar({ liffStatus, lineProfile }) {
+  const hasToken = liffStatus && getIdToken() !== null
+  
   return (
     <div className="status-bar">
       <div className="status-item">
         <span className="status-label">LIFF:</span>
         <span className={`status-value ${liffStatus ? 'success' : 'error'}`}>
           {liffStatus ? '✓ Logged In' : '✗ Not Logged In'}
+        </span>
+      </div>
+      <div className="status-item">
+        <span className="status-label">Token:</span>
+        <span className={`status-value ${hasToken ? 'success' : 'error'}`}>
+          {hasToken ? '✓ Available' : '✗ Missing'}
         </span>
       </div>
       {lineProfile && (

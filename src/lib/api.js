@@ -1,5 +1,5 @@
 // src/lib/api.js
-import liff from "@line/liff";
+import { getIdToken, isLoggedIn } from './liffAuth';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -21,7 +21,11 @@ async function safeJson(res) {
 
 // Helper: for protected functions we require LIFF id_token
 function requireIdToken() {
-  const token = liff.getIDToken();
+  if (!isLoggedIn()) {
+    throw new Error("LIFF is not logged in. Please ensure you're accessing this app through LINE LIFF.");
+  }
+  
+  const token = getIdToken();
   if (!token) {
     throw new Error("Missing LIFF idToken. Are you logged in inside LIFF?");
   }
@@ -30,8 +34,8 @@ function requireIdToken() {
 
 /**
  * Call an Edge Function with LIFF Bearer token (LINE id_token)
- * - tenant_bootstrap is public, so token is optional there
- * - all other functions should require token
+ * - If auth is required (default), token must be present
+ * - If auth is optional (opts.auth = false), token is sent if available but not required
  */
 export async function callFunction(
   functionName,
@@ -43,11 +47,29 @@ export async function callFunction(
       "Content-Type": "application/json",
     };
 
-    if (opts.auth !== false) {
-      headers["Authorization"] = `Bearer ${requireIdToken()}`;
+    // Try to get token if available
+    let token = null;
+    try {
+      if (isLoggedIn()) {
+        token = getIdToken();
+      }
+    } catch (e) {
+      // Token not available, will handle below
     }
 
-    const res = await fetch(`${BASE}/${functionName}`, {
+    // If auth is required, ensure we have a token
+    if (opts.auth !== false) {
+      if (!token) {
+        throw new Error("Missing LIFF idToken. Please ensure you're logged in through LINE LIFF.");
+      }
+      headers["Authorization"] = `Bearer ${token}`;
+    } else if (token) {
+      // Even for public endpoints, send token if available
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const url = `${BASE}/${functionName}`;
+    const res = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body ?? {}),
@@ -61,6 +83,7 @@ export async function callFunction(
         payload?.error ||
         payload?.message ||
         payload?.msg ||
+        payload?.error?.message ||
         JSON.stringify(payload) ||
         `HTTP ${res.status}`;
       return { data: null, error: { message: msg, raw: payload }, status: res.status };
