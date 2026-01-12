@@ -48,16 +48,13 @@ export async function callFunction(
     let token = null;
     try {
       if (isLoggedIn()) {
-        // Check current token expiration
+        // Check current token expiration BEFORE making request
         const currentToken = getIdToken();
         if (currentToken && isTokenExpired(currentToken)) {
-          console.log('[API] Token expired, getting fresh token...');
-          // Get fresh token (may redirect if login needed)
-          token = await getFreshToken();
-          if (!token) {
-            // Redirect happened, return early
-            return { data: null, error: { message: 'Redirecting to LINE login for token refresh' }, status: 0 };
-          }
+          console.log('[API] Token expired before request, will redirect to login...');
+          // Don't redirect here - let the request fail and handle in error handler
+          // This prevents redirect loops
+          token = currentToken; // Use expired token, backend will reject it
         } else {
           token = currentToken;
         }
@@ -133,60 +130,21 @@ export async function callFunction(
         errorMsg.toLowerCase().includes('token')
       );
 
-      // If token expired and we haven't retried, try to refresh and retry once
-      if (isExpiredError && opts.auth !== false && token) {
+      // If token expired error, show message but don't auto-redirect (prevents loops)
+      if (isExpiredError && opts.auth !== false) {
         console.log('[API] Token expired error detected:', errorMsg);
-        console.log('[API] Attempting to refresh token and retry...');
         
-        try {
-          // Get fresh token (may redirect if login needed)
-          const freshToken = await getFreshToken();
-          
-          if (!freshToken) {
-            // Redirect happened, return early
-            return { 
-              data: null, 
-              error: { 
-                message: 'Token expired. Redirecting to LINE login. Please try again after logging in.',
-                type: 'token_expired_redirect'
-              }, 
-              status: 401 
-            };
-          }
-          
-          if (freshToken !== token) {
-            console.log('[API] Got fresh token, retrying request...');
-            
-            // Update headers with fresh token
-            headers["Authorization"] = `Bearer ${freshToken}`;
-            headers["x-line-id-token"] = freshToken;
-            
-            // Retry the request
-            const retryRes = await fetch(url, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(body ?? {}),
-              mode: 'cors',
-              credentials: 'omit',
-            });
-            
-            const retryPayload = await safeJson(retryRes);
-            
-            if (retryRes.ok) {
-              console.log('[API] Retry successful with fresh token');
-              return { data: retryPayload ?? null, error: null, status: retryRes.status };
-            }
-            
-            // If retry also failed, return the error
-            const retryMsg = retryPayload?.error || retryPayload?.message || retryPayload?.msg || retryPayload?.error?.message || JSON.stringify(retryPayload) || `HTTP ${retryRes.status}`;
-            return { data: null, error: { message: retryMsg, raw: retryPayload }, status: retryRes.status };
-          } else {
-            console.warn('[API] Got same token after refresh attempt');
-          }
-        } catch (refreshError) {
-          console.error('[API] Failed to refresh token:', refreshError);
-          // Continue to return original error
-        }
+        // Don't auto-redirect here - let user see the error and manually refresh
+        // Auto-redirect causes loops
+        return { 
+          data: null, 
+          error: { 
+            message: 'Token expired. Please refresh the page to get a new token.',
+            type: 'token_expired',
+            originalError: errorMsg
+          }, 
+          status: 401 
+        };
       }
       
       // normalize error shape

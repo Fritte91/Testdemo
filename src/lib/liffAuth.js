@@ -69,6 +69,7 @@ export function isTokenExpired(token) {
 /**
  * Get fresh token, refreshing LINE login if needed
  * Note: LINE tokens cannot be refreshed - must re-login if expired
+ * Returns null if redirect happens (to prevent further execution)
  */
 export async function getFreshToken() {
   if (!liffInitialized) {
@@ -94,7 +95,10 @@ export async function getFreshToken() {
     
     // LINE tokens cannot be refreshed - must re-login
     // Redirect to LINE login to get a fresh token
-    liff.login({ redirectUri: window.location.href })
+    // Use a small delay to prevent immediate redirect loops
+    setTimeout(() => {
+      liff.login({ redirectUri: window.location.href })
+    }, 100)
     return null // Will redirect away
   }
   

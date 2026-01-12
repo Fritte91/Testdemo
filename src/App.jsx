@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { initLiff, isLoggedIn, getProfile } from './lib/liffAuth'
+import { initLiff, isLoggedIn, getProfile, getIdToken, isTokenExpired } from './lib/liffAuth'
 import { supabase } from './lib/supabase'
 import {
   tenantBootstrap,
@@ -69,13 +69,25 @@ function App() {
           setLineProfile(profile)
         }
 
-        // Auto-load tenant
+        // Check token expiration BEFORE loading tenant
+        const token = getIdToken()
+        if (token && isTokenExpired(token)) {
+          console.log('[App] Token expired on init, redirecting to login...')
+          // Don't set loading to false - let redirect happen
+          return
+        }
+
+        // Auto-load tenant (only if token is valid)
         await loadTenant()
       } catch (error) {
         console.error('Initialization error:', error)
         setAuthError(`Initialization error: ${error.message}`)
-      } finally {
         setLoading(false)
+      } finally {
+        // Only set loading false if we're not redirecting
+        if (liffStatus) {
+          setLoading(false)
+        }
       }
     }
 
@@ -121,6 +133,14 @@ function App() {
 
   const loadTenant = async () => {
     try {
+      // Check token expiration BEFORE loading tenant
+      const token = getIdToken()
+      if (token && isTokenExpired(token)) {
+        console.log('[loadTenant] Token expired, skipping tenant load to prevent redirect loop')
+        setAuthError('Token expired. Please refresh the page to get a new token.')
+        return
+      }
+
       console.log('[loadTenant] Loading tenant with slug:', tenantSlug)
       const { data, error, status } = await tenantBootstrap({ slug: tenantSlug, name: tenantSlug })
       
@@ -139,7 +159,7 @@ function App() {
         
         if (tenantError) {
           console.error('[loadTenant] Failed to query tenant from Supabase:', tenantError)
-          alert(`Tenant "${tenantSlug}" exists but couldn't load it.\n\nError: ${tenantError.message}\n\nCheck RLS policies on tenants table.`)
+          setAuthError(`Tenant "${tenantSlug}" exists but couldn't load it. Error: ${tenantError.message}`)
           return
         }
         
@@ -150,9 +170,16 @@ function App() {
         }
       }
       
+      // Handle token expiration errors
+      if (error && (error.message?.includes('expired') || error.type === 'token_expired')) {
+        console.log('[loadTenant] Token expired error, not retrying to prevent loop')
+        setAuthError('Token expired. Please refresh the page (F5) to get a new token.')
+        return
+      }
+      
       if (error) {
         console.error('Failed to load tenant:', error)
-        alert(`Failed to load tenant "${tenantSlug}": ${error.message || JSON.stringify(error)}\n\nCheck that tenant_bootstrap Edge Function is working.`)
+        setAuthError(`Failed to load tenant "${tenantSlug}": ${error.message || JSON.stringify(error)}`)
         return
       }
       
@@ -166,11 +193,11 @@ function App() {
         setTenant(data)
       } else {
         console.error('[loadTenant] Unexpected response format:', data)
-        alert(`Tenant loaded but unexpected format. Check console for details.`)
+        setAuthError('Tenant loaded but unexpected format. Check console for details.')
       }
     } catch (error) {
       console.error('Error loading tenant:', error)
-      alert(`Error loading tenant: ${error.message}`)
+      setAuthError(`Error loading tenant: ${error.message}`)
     }
   }
 
