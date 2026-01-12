@@ -149,37 +149,57 @@ function App() {
   }
 
   const loadServicesAndStaff = async () => {
-    if (!tenant) return
+    if (!tenant) {
+      console.log('[loadServicesAndStaff] No tenant, skipping')
+      return
+    }
     
+    console.log('[loadServicesAndStaff] Loading for tenant:', tenant.id, tenant.slug)
     setLoadingServices(true)
     try {
       // Query services directly from Supabase
+      console.log('[loadServicesAndStaff] Querying services...')
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
         .select('*')
         .eq('tenant_id', tenant.id)
         .order('name')
 
+      console.log('[loadServicesAndStaff] Services result:', { data: servicesData, error: servicesError })
+
       if (servicesError) {
         console.error('Error loading services:', servicesError)
+        alert(`Error loading services: ${servicesError.message}. Check RLS policies or database connection.`)
       } else if (servicesData) {
+        console.log(`[loadServicesAndStaff] Found ${servicesData.length} services`)
         setServices(servicesData)
+        // Auto-select first service
+        if (servicesData.length > 0 && !selectedService) {
+          setSelectedService(servicesData[0].id)
+        }
+      } else {
+        console.log('[loadServicesAndStaff] No services data returned')
       }
 
       // Query staff directly from Supabase
+      console.log('[loadServicesAndStaff] Querying staff...')
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
         .select('*')
         .eq('tenant_id', tenant.id)
         .order('name')
 
+      console.log('[loadServicesAndStaff] Staff result:', { data: staffData, error: staffError })
+
       if (staffError) {
         console.error('Error loading staff:', staffError)
       } else if (staffData) {
+        console.log(`[loadServicesAndStaff] Found ${staffData.length} staff`)
         setStaff(staffData)
       }
     } catch (error) {
       console.error('Error loading services/staff:', error)
+      alert(`Error: ${error.message}`)
     } finally {
       setLoadingServices(false)
     }
@@ -316,46 +336,19 @@ function App() {
         />
         {tenant && (
           <div className="info-box" style={{ marginTop: '10px', marginBottom: '10px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-              <div>
-                <strong>Tenant:</strong> {tenant.name} ({tenant.slug})
-                <div style={{ fontSize: '0.85em', color: '#666', marginTop: '5px' }}>
-                  ID: {tenant.id}
-                </div>
+            <div style={{ marginBottom: '10px' }}>
+              <strong>Tenant:</strong> {tenant.name} ({tenant.slug})
+              <div style={{ fontSize: '0.85em', color: '#666', marginTop: '5px' }}>
+                ID: {tenant.id}
               </div>
-              <button 
-                onClick={() => {
-                  const newSlug = prompt('Enter tenant slug:', tenantSlug)
-                  if (newSlug && newSlug !== tenantSlug) {
-                    setTenantSlug(newSlug)
-                    setTenant(null)
-                    setServices([])
-                    setStaff([])
-                    setProfileSetup(false)
-                    loadTenant().then(() => {
-                      setTimeout(() => {
-                        setupProfile()
-                        loadServicesAndStaff()
-                      }, 500)
-                    })
-                  }
-                }}
-                style={{ 
-                  padding: '5px 10px', 
-                  fontSize: '0.85em', 
-                  background: '#6c757d', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Change
-              </button>
             </div>
-            {profileSetup && <span style={{ marginLeft: '10px', color: '#28a745' }}>✓ Profile Ready</span>}
-            {services.length > 0 && <span style={{ marginLeft: '10px', color: '#28a745' }}>✓ {services.length} Services</span>}
-            {staff.length > 0 && <span style={{ marginLeft: '10px', color: '#28a745' }}>✓ {staff.length} Staff</span>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {profileSetup && <span style={{ color: '#28a745', background: '#d4edda', padding: '4px 8px', borderRadius: '4px' }}>✓ Profile Ready</span>}
+              {loadingServices && <span style={{ color: '#856404', background: '#fff3cd', padding: '4px 8px', borderRadius: '4px' }}>⏳ Loading...</span>}
+              {!loadingServices && services.length > 0 && <span style={{ color: '#28a745', background: '#d4edda', padding: '4px 8px', borderRadius: '4px' }}>✓ {services.length} Services</span>}
+              {!loadingServices && services.length === 0 && <span style={{ color: '#721c24', background: '#f8d7da', padding: '4px 8px', borderRadius: '4px' }}>⚠️ 0 Services (Check RLS)</span>}
+              {!loadingServices && staff.length > 0 && <span style={{ color: '#28a745', background: '#d4edda', padding: '4px 8px', borderRadius: '4px' }}>✓ {staff.length} Staff</span>}
+            </div>
           </div>
         )}
         {authError && (
@@ -366,6 +359,56 @@ function App() {
       </header>
 
       <main>
+        {/* Tenant Switcher - BIG AND OBVIOUS */}
+        <section className="test-section" style={{ background: '#e7f3ff', border: '2px solid #3498db' }}>
+          <h2 style={{ marginTop: 0 }}>🔧 Tenant Settings</h2>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <strong>Current Tenant:</strong> {tenant?.slug || tenantSlug}
+              {tenant && <div style={{ fontSize: '0.85em', color: '#666' }}>ID: {tenant.id}</div>}
+            </div>
+            <button 
+              onClick={() => {
+                const newSlug = prompt('Enter tenant slug (e.g. demo-salon):', tenantSlug)
+                if (newSlug && newSlug !== tenantSlug) {
+                  setTenantSlug(newSlug)
+                  setTenant(null)
+                  setServices([])
+                  setStaff([])
+                  setProfileSetup(false)
+                  setSelectedService('')
+                  loadTenant().then(() => {
+                    setTimeout(() => {
+                      setupProfile()
+                      loadServicesAndStaff()
+                    }, 500)
+                  })
+                }
+              }}
+              className="action-btn"
+              style={{ 
+                background: '#28a745',
+                fontSize: '16px',
+                padding: '12px 20px',
+                fontWeight: 'bold'
+              }}
+            >
+              🔄 Change Tenant
+            </button>
+            <button 
+              onClick={loadServicesAndStaff}
+              className="action-btn"
+              style={{ 
+                background: '#17a2b8',
+                fontSize: '16px',
+                padding: '12px 20px'
+              }}
+            >
+              🔄 Reload Services
+            </button>
+          </div>
+        </section>
+
         {/* Quick Actions */}
         <section className="test-section">
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px' }}>
@@ -388,33 +431,50 @@ function App() {
           {loadingServices ? (
             <div>Loading services...</div>
           ) : services.length > 0 ? (
-            <div className="form-group">
-              <label>
-                Service:
-                <select 
-                  value={selectedService} 
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                >
-                  <option value="">-- Select a service --</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name} {service.duration && `(${service.duration} min)`} {service.price && `- ${service.price} THB`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <>
+              <div className="info-box" style={{ background: '#d4edda', marginBottom: '10px' }}>
+                ✓ Found {services.length} service(s) for {tenant?.name}
+              </div>
+              <div className="form-group">
+                <label>
+                  Service:
+                  <select 
+                    value={selectedService} 
+                    onChange={(e) => setSelectedService(e.target.value)}
+                    style={{ width: '100%', padding: '8px', marginTop: '5px', fontSize: '16px' }}
+                  >
+                    <option value="">-- Select a service --</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name} {service.duration && `(${service.duration} min)`} {service.price && `- ${service.price} THB`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </>
           ) : (
-            <div className="info-box">
-              <p>No services found. You can still enter a Service ID manually:</p>
+            <div className="info-box" style={{ background: '#fff3cd' }}>
+              <p><strong>⚠️ No services found for tenant "{tenant?.slug}"</strong></p>
+              <p style={{ fontSize: '0.9em', marginTop: '5px' }}>
+                Tenant ID: {tenant?.id}<br/>
+                Make sure services exist in the database with tenant_id = {tenant?.id}
+              </p>
+              <p style={{ marginTop: '10px' }}>You can still enter a Service ID manually:</p>
               <input 
                 type="text" 
                 value={selectedService} 
                 onChange={(e) => setSelectedService(e.target.value)}
-                placeholder="Enter service ID"
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                placeholder="Enter service ID (e.g. 03330340-94e9-4252-9b62-51b21ccf0b8e)"
+                style={{ width: '100%', padding: '8px', marginTop: '5px', fontSize: '16px' }}
               />
+              <button 
+                onClick={loadServicesAndStaff}
+                className="action-btn"
+                style={{ marginTop: '10px', width: '100%' }}
+              >
+                🔄 Retry Loading Services
+              </button>
             </div>
           )}
 
