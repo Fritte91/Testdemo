@@ -151,25 +151,40 @@ function App() {
   const loadServicesAndStaff = async () => {
     if (!tenant) {
       console.log('[loadServicesAndStaff] No tenant, skipping')
+      alert('No tenant loaded. Please wait for tenant to load first.')
       return
     }
     
     console.log('[loadServicesAndStaff] Loading for tenant:', tenant.id, tenant.slug)
     setLoadingServices(true)
+    
+    let errorMessage = ''
+    
     try {
       // Query services directly from Supabase
-      console.log('[loadServicesAndStaff] Querying services...')
+      console.log('[loadServicesAndStaff] Querying services with tenant_id:', tenant.id)
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
         .select('*')
         .eq('tenant_id', tenant.id)
         .order('name')
 
-      console.log('[loadServicesAndStaff] Services result:', { data: servicesData, error: servicesError })
+      console.log('[loadServicesAndStaff] Services result:', { 
+        data: servicesData, 
+        error: servicesError,
+        count: servicesData?.length || 0
+      })
 
       if (servicesError) {
         console.error('Error loading services:', servicesError)
-        alert(`Error loading services: ${servicesError.message}. Check RLS policies or database connection.`)
+        errorMessage += `Services Error: ${servicesError.message} (Code: ${servicesError.code || 'N/A'})\n`
+        
+        // Check if it's an RLS error
+        if (servicesError.message?.includes('permission') || servicesError.message?.includes('policy') || servicesError.code === '42501') {
+          errorMessage += '\n⚠️ This looks like an RLS (Row Level Security) error.\n'
+          errorMessage += 'You need to create a policy to allow anonymous reads on the services table.\n'
+          errorMessage += 'See SUPABASE_RLS_FIX.md for instructions.\n'
+        }
       } else if (servicesData) {
         console.log(`[loadServicesAndStaff] Found ${servicesData.length} services`)
         setServices(servicesData)
@@ -178,28 +193,40 @@ function App() {
           setSelectedService(servicesData[0].id)
         }
       } else {
-        console.log('[loadServicesAndStaff] No services data returned')
+        console.log('[loadServicesAndStaff] No services data returned (null/undefined)')
+        errorMessage += `No services found for tenant_id: ${tenant.id}\n`
+        errorMessage += `Make sure services exist in the database with tenant_id = ${tenant.id}\n`
       }
 
       // Query staff directly from Supabase
-      console.log('[loadServicesAndStaff] Querying staff...')
+      console.log('[loadServicesAndStaff] Querying staff with tenant_id:', tenant.id)
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
         .select('*')
         .eq('tenant_id', tenant.id)
         .order('name')
 
-      console.log('[loadServicesAndStaff] Staff result:', { data: staffData, error: staffError })
+      console.log('[loadServicesAndStaff] Staff result:', { 
+        data: staffData, 
+        error: staffError,
+        count: staffData?.length || 0
+      })
 
       if (staffError) {
         console.error('Error loading staff:', staffError)
+        errorMessage += `Staff Error: ${staffError.message} (Code: ${staffError.code || 'N/A'})\n`
       } else if (staffData) {
         console.log(`[loadServicesAndStaff] Found ${staffData.length} staff`)
         setStaff(staffData)
       }
+
+      // Show error if any
+      if (errorMessage && services.length === 0) {
+        alert(`Error loading data:\n\n${errorMessage}\n\nCheck browser console for details.`)
+      }
     } catch (error) {
       console.error('Error loading services/staff:', error)
-      alert(`Error: ${error.message}`)
+      alert(`Unexpected error: ${error.message}\n\nCheck browser console for details.`)
     } finally {
       setLoadingServices(false)
     }
@@ -455,12 +482,26 @@ function App() {
             </>
           ) : (
             <div className="info-box" style={{ background: '#fff3cd' }}>
-              <p><strong>⚠️ No services found for tenant "{tenant?.slug}"</strong></p>
+              <p><strong>⚠️ No services found for tenant "{tenant?.slug || 'N/A'}"</strong></p>
               <p style={{ fontSize: '0.9em', marginTop: '5px' }}>
-                Tenant ID: {tenant?.id}<br/>
-                Make sure services exist in the database with tenant_id = {tenant?.id}
+                <strong>Tenant ID:</strong> {tenant?.id || 'Not loaded'}<br/>
+                <strong>Tenant Slug:</strong> {tenant?.slug || tenantSlug}<br/>
+                <br/>
+                <strong>Possible Issues:</strong><br/>
+                1. RLS (Row Level Security) is blocking queries - Check SUPABASE_RLS_FIX.md<br/>
+                2. No services exist with tenant_id = {tenant?.id || 'N/A'}<br/>
+                3. Services table name might be different<br/>
               </p>
-              <p style={{ marginTop: '10px' }}>You can still enter a Service ID manually:</p>
+              <div style={{ marginTop: '15px', padding: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
+                <strong>Quick Fix:</strong>
+                <ol style={{ marginTop: '5px', paddingLeft: '20px' }}>
+                  <li>Open Supabase Dashboard</li>
+                  <li>Go to Table Editor → services table</li>
+                  <li>Click "RLS policies"</li>
+                  <li>Create policy: Allow SELECT for 'anon' role</li>
+                </ol>
+              </div>
+              <p style={{ marginTop: '15px' }}>You can still enter a Service ID manually:</p>
               <input 
                 type="text" 
                 value={selectedService} 
@@ -474,6 +515,21 @@ function App() {
                 style={{ marginTop: '10px', width: '100%' }}
               >
                 🔄 Retry Loading Services
+              </button>
+              <button 
+                onClick={() => {
+                  console.log('Current state:', {
+                    tenant,
+                    tenantSlug,
+                    services,
+                    staff
+                  })
+                  alert('Check browser console (F12) for detailed debug info')
+                }}
+                className="action-btn"
+                style={{ marginTop: '10px', width: '100%', background: '#6c757d' }}
+              >
+                🔍 Show Debug Info (Check Console)
               </button>
             </div>
           )}
