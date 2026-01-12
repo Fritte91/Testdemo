@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import liff from '@line/liff'
 import { initLiff, isLoggedIn, getProfile, getIdToken, isTokenExpired } from './lib/liffAuth'
 import { supabase } from './lib/supabase'
 import {
@@ -69,11 +70,13 @@ function App() {
           setLineProfile(profile)
         }
 
-        // Check token expiration BEFORE loading tenant
+        // Token expiration is already checked in initLiff()
+        // If we get here, token should be valid
+        // Double-check just to be safe
         const token = getIdToken()
         if (token && isTokenExpired(token)) {
-          console.log('[App] Token expired on init, showing error instead of redirecting')
-          setAuthError('Token expired. Please click "Refresh Page" button below to get a new token.')
+          console.log('[App] Token expired after initLiff, this should not happen')
+          setAuthError('Token expired. Please refresh the page (F5) to get a new token.')
           setLoading(false)
           return
         }

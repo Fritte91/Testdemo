@@ -10,10 +10,20 @@ let liffInitialized = false
 
 /**
  * Initialize LIFF and ensure user is logged in
+ * Also checks if token is expired and re-authenticates if needed
  */
 export async function initLiff() {
   if (liffInitialized) {
-    return
+    // Check if token is expired even if already initialized
+    const token = getIdToken()
+    if (token && isTokenExpired(token)) {
+      console.log('[initLiff] Token expired, re-authenticating...')
+      // Clear query params to avoid duplicate auth params
+      const cleanUrl = window.location.href.split('?')[0]
+      liff.login({ redirectUri: cleanUrl })
+      return false // Will redirect
+    }
+    return true // Already initialized and logged in
   }
 
   try {
@@ -21,11 +31,21 @@ export async function initLiff() {
     liffInitialized = true
 
     if (!liff.isLoggedIn()) {
-      liff.login({ redirectUri: window.location.href })
-      return false
+      const cleanUrl = window.location.href.split('?')[0]
+      liff.login({ redirectUri: cleanUrl })
+      return false // LIFF login initiated, will redirect
     }
 
-    return true
+    // Check if token is expired right after login
+    const token = getIdToken()
+    if (token && isTokenExpired(token)) {
+      console.log('[initLiff] Token expired after login, re-authenticating...')
+      const cleanUrl = window.location.href.split('?')[0]
+      liff.login({ redirectUri: cleanUrl })
+      return false // Will redirect
+    }
+
+    return true // Successfully initialized and logged in
   } catch (error) {
     console.error('LIFF initialization error:', error)
     throw error
