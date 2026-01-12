@@ -137,16 +137,28 @@ function App() {
 
   const handleEnsureProfile = async () => {
     setSetupResult(null)
-    const { data, error } = await ensureProfileAndCustomer()
-    setSetupResult({ request: {}, response: data, error })
+    const requestPayload = {
+      slug: tenantSlug,
+      ...(tenantLiffId && { liffId: tenantLiffId })
+    }
+    const { data, error } = await ensureProfileAndCustomer(requestPayload)
+    setSetupResult({ request: requestPayload, response: data, error })
   }
 
   const handleAvailabilitySearch = async () => {
     setAvailabilityResult(null)
     setSelectedSlot(null)
-    const { data, error } = await availabilitySearch(serviceId, dateFrom, dateTo, staffId || null)
+    const requestPayload = {
+      slug: tenantSlug,
+      serviceId,
+      dateFrom,
+      dateTo,
+      ...(staffId && { staffId }),
+      ...(tenantLiffId && { liffId: tenantLiffId })
+    }
+    const { data, error } = await availabilitySearch(requestPayload)
     setAvailabilityResult({ 
-      request: { serviceId, dateFrom, dateTo, staffId: staffId || null }, 
+      request: requestPayload, 
       response: data, 
       error 
     })
@@ -167,21 +179,16 @@ function App() {
       return
     }
     setHoldResult(null)
-    const { data, error } = await createHold(
+    const requestPayload = {
+      slug: tenantSlug,
       serviceId,
-      selectedSlot.staffId || staffId,
-      selectedSlot.startAt,
-      tenantSlug,
-      tenantLiffId || null
-    )
+      staffId: selectedSlot.staffId || staffId,
+      startAt: selectedSlot.startAt,
+      ...(tenantLiffId && { liffId: tenantLiffId })
+    }
+    const { data, error } = await createHold(requestPayload)
     setHoldResult({ 
-      request: { 
-        serviceId, 
-        staffId: selectedSlot.staffId || staffId, 
-        startAt: selectedSlot.startAt, 
-        slug: tenantSlug,
-        liffId: tenantLiffId || null
-      }, 
+      request: requestPayload, 
       response: data, 
       error 
     })
@@ -196,9 +203,13 @@ function App() {
       return
     }
     setConfirmResult(null)
-    const { data, error } = await confirmBooking(holdId, bookingNotes)
+    const requestPayload = {
+      holdId,
+      ...(bookingNotes && { notes: bookingNotes })
+    }
+    const { data, error } = await confirmBooking(requestPayload)
     setConfirmResult({ 
-      request: { holdId, notes: bookingNotes }, 
+      request: requestPayload, 
       response: data, 
       error 
     })
@@ -216,9 +227,14 @@ function App() {
       return
     }
     setPaymentResult(null)
-    const { data, error } = await paymentInit(bookingId, tenantSlug, tenantLiffId || null)
+    const requestPayload = {
+      bookingId,
+      slug: tenantSlug,
+      ...(tenantLiffId && { liffId: tenantLiffId })
+    }
+    const { data, error } = await paymentInit(requestPayload)
     setPaymentResult({ 
-      request: { bookingId, slug: tenantSlug, liffId: tenantLiffId || null }, 
+      request: requestPayload, 
       response: data, 
       error 
     })

@@ -1,7 +1,7 @@
-// src/lib/api.ts
+// src/lib/api.js
 import liff from "@line/liff";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 if (!SUPABASE_URL) {
   throw new Error("Missing VITE_SUPABASE_URL in environment variables");
@@ -11,7 +11,7 @@ if (!SUPABASE_URL) {
 const BASE = `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1`;
 
 // Helper: parse JSON safely
-async function safeJson(res: Response) {
+async function safeJson(res) {
   try {
     return await res.json();
   } catch {
@@ -20,7 +20,7 @@ async function safeJson(res: Response) {
 }
 
 // Helper: for protected functions we require LIFF id_token
-function requireIdToken(): string {
+function requireIdToken() {
   const token = liff.getIDToken();
   if (!token) {
     throw new Error("Missing LIFF idToken. Are you logged in inside LIFF?");
@@ -33,13 +33,13 @@ function requireIdToken(): string {
  * - tenant_bootstrap is public, so token is optional there
  * - all other functions should require token
  */
-export async function callFunction<TResponse>(
-  functionName: string,
-  body: Record<string, any> = {},
-  opts: { auth?: boolean } = { auth: true }
-): Promise<{ data: TResponse | null; error: any | null; status: number }> {
+export async function callFunction(
+  functionName,
+  body = {},
+  opts = { auth: true }
+) {
   try {
-    const headers: Record<string, string> = {
+    const headers = {
       "Content-Type": "application/json",
     };
 
@@ -66,57 +66,38 @@ export async function callFunction<TResponse>(
       return { data: null, error: { message: msg, raw: payload }, status: res.status };
     }
 
-    return { data: (payload as TResponse) ?? null, error: null, status: res.status };
-  } catch (error: any) {
+    return { data: payload ?? null, error: null, status: res.status };
+  } catch (error) {
     return { data: null, error: { message: error?.message ?? String(error) }, status: 0 };
   }
 }
 
 /** tenant_bootstrap (PUBLIC) */
-export function tenantBootstrap(slug: string, liffId: string | null = null) {
+export function tenantBootstrap(slug, liffId = null) {
   return callFunction("tenant_bootstrap", { slug, liffId }, { auth: false });
 }
 
 /** ensure_profile_and_customer (AUTH via LIFF id_token) */
-export function ensureProfileAndCustomer(payload: {
-  slug?: string | null;
-  liffId?: string | null;
-  displayName?: string | null;
-  phone?: string | null;
-  pictureUrl?: string | null;
-} = {}) {
+export function ensureProfileAndCustomer(payload = {}) {
   return callFunction("ensure_profile_and_customer", payload, { auth: true });
 }
 
 /** availability_search (AUTH via LIFF id_token) */
-export function availabilitySearch(payload: {
-  slug?: string | null;
-  liffId?: string | null;
-  serviceId: string;
-  staffId?: string | null;
-  dateFrom: string;
-  dateTo: string;
-}) {
+export function availabilitySearch(payload) {
   return callFunction("availability_search", payload, { auth: true });
 }
 
 /** create_hold (AUTH via LIFF id_token) */
-export function createHold(payload: {
-  slug?: string | null;
-  liffId?: string | null;
-  serviceId: string;
-  staffId: string | null;
-  startAt: string;
-}) {
+export function createHold(payload) {
   return callFunction("create_hold", payload, { auth: true });
 }
 
 /** confirm_booking (AUTH via LIFF id_token) */
-export function confirmBooking(payload: { holdId: string; notes?: string | null }) {
+export function confirmBooking(payload) {
   return callFunction("confirm_booking", payload, { auth: true });
 }
 
 /** payment_init (AUTH via LIFF id_token) */
-export function paymentInit(payload: { bookingId: string; slug?: string | null; liffId?: string | null }) {
+export function paymentInit(payload) {
   return callFunction("payment_init", payload, { auth: true });
 }
