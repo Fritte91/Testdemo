@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { initLiff, getIdToken, isLoggedIn } from './lib/liffAuth'
+import { initLiff, isLoggedIn } from './lib/liffAuth'
 import { supabase } from './lib/supabase'
 import {
   tenantBootstrap,
@@ -65,40 +65,43 @@ function App() {
 
         setLiffStatus(true)
 
-        // Get ID token and sign into Supabase
-        const idToken = getIdToken()
-        if (!idToken) {
-          setAuthError('Failed to get LIFF ID token')
+        // Check for existing Supabase session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          setAuthError(`Session check error: ${sessionError.message}`)
           setLoading(false)
           return
         }
 
-        // Check if signInWithIdToken is available
-        if (typeof supabase.auth.signInWithIdToken !== 'function') {
-          setAuthError(
-            'signInWithIdToken is not available. Please upgrade @supabase/supabase-js to version 2.39.0 or later.'
-          )
-          setLoading(false)
-          return
-        }
-
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'line',
-          token: idToken
-        })
-
-        if (error) {
-          setAuthError(`Supabase auth error: ${error.message}`)
-          setLoading(false)
-          return
-        }
-
-        if (data?.user) {
-          setSupabaseUser(data.user.id)
+        if (session?.user) {
+          // Session already exists
+          setSupabaseUser(session.user.id)
           setSupabaseSession(true)
+          setLoading(false)
+        } else {
+          // No session, initiate OAuth flow
+          const origin = window.location.origin
+          const redirectTo = `${origin}/auth/callback`
+
+          const { error: oauthError } = await supabase.auth.signInWithOAuth({
+            provider: 'line',
+            options: {
+              redirectTo: redirectTo
+            }
+          })
+
+          if (oauthError) {
+            setAuthError(`OAuth error: ${oauthError.message}`)
+            setLoading(false)
+            return
+          }
+
+          // OAuth will redirect away, so we don't set loading to false here
+          // The redirect will happen automatically
         }
 
-        // Set up session listener
+        // Set up session listener for future auth state changes
         supabase.auth.onAuthStateChange((event, session) => {
           if (session?.user) {
             setSupabaseUser(session.user.id)
@@ -111,7 +114,6 @@ function App() {
       } catch (error) {
         console.error('Initialization error:', error)
         setAuthError(`Initialization error: ${error.message}`)
-      } finally {
         setLoading(false)
       }
     }

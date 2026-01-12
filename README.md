@@ -5,7 +5,7 @@ A Vite + React application for testing Supabase Edge Functions within a LIFF (LI
 ## Features
 
 - LIFF authentication integration
-- Supabase authentication using LINE ID token
+- Supabase authentication using LINE OAuth flow
 - End-to-end testing of Edge Functions:
   - `tenant_bootstrap` (public)
   - `ensure_profile_and_customer` (auth)
@@ -22,7 +22,8 @@ A Vite + React application for testing Supabase Edge Functions within a LIFF (LI
 - Node.js 18+ and npm/yarn
 - A Supabase project with Edge Functions deployed
 - A LINE LIFF app configured
-- `@supabase/supabase-js` version 2.39.0 or later (for `signInWithIdToken` support)
+- `@supabase/supabase-js` version 2.39.0 or later
+- Supabase LINE OAuth provider configured
 
 ## Setup
 
@@ -74,16 +75,35 @@ Deploy the `dist` directory to any static hosting service:
 - AWS S3 + CloudFront
 - Any other static host
 
-### 6. Configure LIFF Endpoint URL
+### 6. Configure Supabase Auth Settings
+
+**IMPORTANT**: You must configure Supabase authentication settings before the app will work.
+
+1. Go to your Supabase Dashboard
+2. Navigate to **Authentication** → **URL Configuration**
+   - Set **Site URL** to your production URL (e.g., `https://your-app.vercel.app`)
+   - Add **Redirect URLs**:
+     - `https://your-app.vercel.app/auth/callback` (production)
+     - `http://localhost:5173/auth/callback` (development)
+3. Navigate to **Authentication** → **Providers**
+   - Enable **LINE** provider
+   - Configure LINE provider with:
+     - **Channel ID**: Your LINE Channel ID
+     - **Channel Secret**: Your LINE Channel Secret
+     - **Callback URL**: Use the callback URL provided by Supabase (usually `https://<project-ref>.supabase.co/auth/v1/callback`)
+
+### 7. Configure LIFF Endpoint URL
 
 1. Go to your LINE Developers Console
 2. Navigate to your LIFF app settings
 3. Set the LIFF endpoint URL to your deployed app URL
 4. Ensure the redirect URI matches your deployment URL
 
+**Note**: After updating environment variables in Vercel, you must redeploy for changes to take effect.
+
 ## Usage
 
-1. **Initialization**: The app automatically initializes LIFF and attempts to sign in to Supabase using your LINE ID token.
+1. **Initialization**: The app automatically initializes LIFF and initiates Supabase OAuth flow with LINE provider. After OAuth completes, you'll be redirected back to the app with an active session.
 
 2. **Status Bar**: Check the top of the app to see:
    - LIFF login status
@@ -108,17 +128,19 @@ Deploy the `dist` directory to any static hosting service:
 
 ### Authentication Errors
 
-- **"signInWithIdToken is not available"**: Upgrade `@supabase/supabase-js` to version 2.39.0 or later:
-  ```bash
-  npm install @supabase/supabase-js@latest
-  ```
+- **"OAuth error"** or **"Custom OIDC provider 'line' not allowed"**: 
+  - Ensure LINE provider is enabled in Supabase Dashboard → Authentication → Providers
+  - Verify LINE Channel ID and Channel Secret are correctly configured
+  - Check that redirect URLs are properly set in Supabase URL Configuration
 
 - **"Failed to get LIFF ID token"**: Ensure you're accessing the app through LIFF and that LIFF initialization completed successfully.
 
-- **"Supabase auth error"**: Check that:
-  - Your Supabase project has LINE authentication provider configured
-  - The ID token is valid and not expired
-  - Your Supabase project URL and anon key are correct
+- **"No session found"** after OAuth callback:
+  - Verify the redirect URL in Supabase matches your callback route (`/auth/callback`)
+  - Check that your Vercel deployment URL is added to Supabase redirect URLs
+  - Ensure environment variables are set correctly in Vercel and redeployed
+
+- **Session check errors**: Verify your Supabase project URL and anon key are correct in environment variables
 
 ### Function Call Errors
 
@@ -138,6 +160,7 @@ src/
     StatusBar.jsx    # Status display component
     JsonPanel.jsx    # JSON viewer component
   App.jsx            # Main application component
+  AuthCallback.jsx   # OAuth callback handler
   main.jsx           # Application entry point
   index.css          # Application styles
 ```
