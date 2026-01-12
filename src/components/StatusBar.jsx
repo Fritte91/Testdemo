@@ -1,7 +1,9 @@
 import { getIdToken } from '../lib/liffAuth'
 
 export function StatusBar({ liffStatus, lineProfile }) {
-  const hasToken = liffStatus && getIdToken() !== null
+  const token = getIdToken()
+  const hasToken = liffStatus && token !== null
+  const tokenPreview = token ? `${token.substring(0, 20)}...${token.substring(token.length - 10)}` : 'N/A'
   
   return (
     <div className="status-bar">
@@ -32,6 +34,14 @@ export function StatusBar({ liffStatus, lineProfile }) {
             </span>
           </div>
         </>
+      )}
+      {hasToken && (
+        <div className="status-item" style={{ fontSize: '0.8em', color: '#666', marginTop: '5px' }}>
+          <span className="status-label">Token Preview:</span>
+          <span className="status-value" style={{ fontFamily: 'monospace' }}>
+            {tokenPreview}
+          </span>
+        </div>
       )}
     </div>
   )

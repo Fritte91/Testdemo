@@ -103,10 +103,16 @@ export async function callFunction(
 
     const url = `${BASE}/${functionName}`;
     
-    // Debug: log request details (token will be truncated in console)
-    if (token) {
-      console.log(`[API] Calling ${functionName} with token: ${token.substring(0, 20)}...`);
-    }
+    // Debug: log request details
+    console.log(`[API] Calling ${functionName}:`, {
+      url,
+      headers: {
+        ...headers,
+        Authorization: headers.Authorization ? `${headers.Authorization.substring(0, 30)}...` : 'none',
+        apikey: headers.apikey ? `${headers.apikey.substring(0, 20)}...` : 'none',
+      },
+      body
+    });
     
     let res;
     try {
@@ -152,8 +158,15 @@ export async function callFunction(
 }
 
 /** tenant_bootstrap (PUBLIC) */
-export function tenantBootstrap(slug, liffId = null) {
-  return callFunction("tenant_bootstrap", { slug, liffId }, { auth: false });
+export function tenantBootstrap(payload) {
+  // Accept either object payload or legacy (slug, liffId) format
+  if (typeof payload === 'string') {
+    // Legacy format: tenantBootstrap(slug, liffId)
+    const [slug, liffId] = arguments;
+    return callFunction("tenant_bootstrap", { slug, name: slug, liffId }, { auth: false });
+  }
+  // New format: tenantBootstrap({ slug, name, liffId })
+  return callFunction("tenant_bootstrap", payload, { auth: false });
 }
 
 /** ensure_profile_and_customer (AUTH via LIFF id_token) */

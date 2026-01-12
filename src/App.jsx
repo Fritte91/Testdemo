@@ -89,8 +89,14 @@ function App() {
 
   const handleTenantBootstrap = async () => {
     setBootstrapResult(null)
-    const { data, error } = await tenantBootstrap(tenantSlug, tenantLiffId || null)
-    setBootstrapResult({ request: { slug: tenantSlug, liffId: tenantLiffId || null }, response: data, error })
+    // Backend requires 'name' parameter - derive from slug or use slug as name
+    const requestPayload = {
+      slug: tenantSlug,
+      name: tenantSlug, // Use slug as name if not provided separately
+      ...(tenantLiffId && { liffId: tenantLiffId })
+    }
+    const { data, error } = await tenantBootstrap(requestPayload)
+    setBootstrapResult({ request: requestPayload, response: data, error })
   }
 
   const handleEnsureProfile = async () => {
