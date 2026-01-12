@@ -1,4 +1,5 @@
 // src/lib/api.js
+import liff from '@line/liff';
 import { getIdToken, isLoggedIn } from './liffAuth';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -19,16 +20,32 @@ async function safeJson(res) {
   }
 }
 
-// Helper: for protected functions we require LIFF id_token
-function requireIdToken() {
+// Helper: Get fresh token (refresh if needed)
+async function getFreshToken() {
   if (!isLoggedIn()) {
     throw new Error("LIFF is not logged in. Please ensure you're accessing this app through LINE LIFF.");
   }
   
-  const token = getIdToken();
+  // Try to get a fresh token - LIFF tokens can expire
+  let token = null;
+  try {
+    // Check if we can get a fresh token
+    if (liff.isLoggedIn && liff.isLoggedIn()) {
+      token = liff.getIDToken();
+    }
+  } catch (e) {
+    console.warn('Error getting fresh token:', e);
+  }
+  
+  if (!token) {
+    // Fallback to getIdToken helper
+    token = getIdToken();
+  }
+  
   if (!token) {
     throw new Error("Missing LIFF idToken. Are you logged in inside LIFF?");
   }
+  
   return token;
 }
 
@@ -47,14 +64,17 @@ export async function callFunction(
       "Content-Type": "application/json",
     };
 
-    // Try to get token if available
+    // Try to get fresh token if available
     let token = null;
     try {
       if (isLoggedIn()) {
-        token = getIdToken();
+        token = await getFreshToken();
       }
     } catch (e) {
       // Token not available, will handle below
+      if (opts.auth !== false) {
+        throw e; // Re-throw if auth is required
+      }
     }
 
     // If auth is required, ensure we have a token
@@ -62,13 +82,22 @@ export async function callFunction(
       if (!token) {
         throw new Error("Missing LIFF idToken. Please ensure you're logged in through LINE LIFF.");
       }
+      // Try both header formats - some backends expect x-line-id-token
       headers["Authorization"] = `Bearer ${token}`;
+      headers["x-line-id-token"] = token;
     } else if (token) {
-      // Even for public endpoints, send token if available
+      // Even for public endpoints, send token if available (both formats)
       headers["Authorization"] = `Bearer ${token}`;
+      headers["x-line-id-token"] = token;
     }
 
     const url = `${BASE}/${functionName}`;
+    
+    // Debug: log request details (token will be truncated in console)
+    if (token) {
+      console.log(`[API] Calling ${functionName} with token: ${token.substring(0, 20)}...`);
+    }
+    
     const res = await fetch(url, {
       method: "POST",
       headers,
