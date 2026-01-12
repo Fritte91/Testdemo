@@ -193,3 +193,13 @@ export function confirmBooking(payload) {
 export function paymentInit(payload) {
   return callFunction("payment_init", payload, { auth: true });
 }
+
+/** list_services (AUTH via LIFF id_token) - Get available services for tenant */
+export function listServices(payload = {}) {
+  return callFunction("list_services", payload, { auth: true });
+}
+
+/** list_staff (AUTH via LIFF id_token) - Get available staff for tenant */
+export function listStaff(payload = {}) {
+  return callFunction("list_staff", payload, { auth: true });
+}
