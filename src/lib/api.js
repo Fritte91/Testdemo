@@ -148,7 +148,7 @@ export async function callFunction(
         payload?.error?.message ||
         JSON.stringify(payload) ||
         `HTTP ${res.status}`;
-      return { data: null, error: { message: msg, raw: payload }, status: res.status };
+      return { data: payload ?? null, error: { message: msg, raw: payload }, status: res.status };
     }
 
     return { data: payload ?? null, error: null, status: res.status };

@@ -35,6 +35,18 @@ Create a new policy:
   tenant_id IN (SELECT id FROM tenants WHERE slug = current_setting('app.tenant_slug', true)::text)
   ```
 
+## Also Fix `tenants` Table
+
+The app also queries the `tenants` table directly as a fallback. Create a policy:
+
+```sql
+CREATE POLICY "Allow anon read tenants"
+ON tenants
+FOR SELECT
+TO anon
+USING (true);
+```
+
 ## Quick Fix (For Testing Only)
 
 If you just want to test quickly, you can temporarily disable RLS:

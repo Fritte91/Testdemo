@@ -122,9 +122,33 @@ function App() {
   const loadTenant = async () => {
     try {
       console.log('[loadTenant] Loading tenant with slug:', tenantSlug)
-      const { data, error } = await tenantBootstrap({ slug: tenantSlug, name: tenantSlug })
+      const { data, error, status } = await tenantBootstrap({ slug: tenantSlug, name: tenantSlug })
       
-      console.log('[loadTenant] Response:', { data, error })
+      console.log('[loadTenant] Response:', { data, error, status })
+      
+      // Handle 409 - tenant already exists (backend should return it, but if not, query directly)
+      if (error && (status === 409 || error.message?.includes('already exists'))) {
+        console.log('[loadTenant] Tenant exists (409), querying directly from Supabase...')
+        
+        // Fallback: Query tenant directly from Supabase
+        const { data: tenantData, error: tenantError } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('slug', tenantSlug)
+          .single()
+        
+        if (tenantError) {
+          console.error('[loadTenant] Failed to query tenant from Supabase:', tenantError)
+          alert(`Tenant "${tenantSlug}" exists but couldn't load it.\n\nError: ${tenantError.message}\n\nCheck RLS policies on tenants table.`)
+          return
+        }
+        
+        if (tenantData) {
+          console.log('[loadTenant] Tenant loaded from Supabase:', tenantData)
+          setTenant(tenantData)
+          return
+        }
+      }
       
       if (error) {
         console.error('Failed to load tenant:', error)
