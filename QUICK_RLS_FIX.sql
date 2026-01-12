@@ -1,135 +1,345 @@
 -- Quick RLS Fix for Testing
--- Run this in Supabase SQL Editor to allow the app to work
+-- Run this in Supabase SQL Editor
+-- If policies already exist, you'll get errors - that's OK, they're already created
+
+-- First, drop existing policies if they exist (optional - comment out if you want to keep existing ones)
+-- DROP POLICY IF EXISTS "Allow anon read tenants" ON tenants;
+-- DROP POLICY IF EXISTS "Allow anon read services" ON services;
+-- DROP POLICY IF EXISTS "Allow anon read staff" ON staff;
 
 -- Tenants (public read)
-CREATE POLICY IF NOT EXISTS "Allow anon read tenants"
-ON tenants
-FOR SELECT
-TO anon
-USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'tenants' 
+    AND policyname = 'Allow anon read tenants'
+  ) THEN
+    CREATE POLICY "Allow anon read tenants"
+    ON public.tenants
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
--- Services (public read for active tenants)
-CREATE POLICY IF NOT EXISTS "Allow anon read services"
-ON services
-FOR SELECT
-TO anon
-USING (true);
+-- Services (public read)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'services' 
+    AND policyname = 'Allow anon read services'
+  ) THEN
+    CREATE POLICY "Allow anon read services"
+    ON public.services
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
--- Staff (public read for active tenants)
-CREATE POLICY IF NOT EXISTS "Allow anon read staff"
-ON staff
-FOR SELECT
-TO anon
-USING (true);
+-- Staff (public read)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'staff' 
+    AND policyname = 'Allow anon read staff'
+  ) THEN
+    CREATE POLICY "Allow anon read staff"
+    ON public.staff
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
--- Profiles (read/write - Edge Functions validate LINE token)
-CREATE POLICY IF NOT EXISTS "Allow anon read profiles"
-ON profiles
-FOR SELECT
-TO anon
-USING (true);
+-- Profiles (read/write)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'profiles' 
+    AND policyname = 'Allow anon read profiles'
+  ) THEN
+    CREATE POLICY "Allow anon read profiles"
+    ON public.profiles
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon insert profiles"
-ON profiles
-FOR INSERT
-TO anon
-WITH CHECK (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'profiles' 
+    AND policyname = 'Allow anon insert profiles'
+  ) THEN
+    CREATE POLICY "Allow anon insert profiles"
+    ON public.profiles
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon update profiles"
-ON profiles
-FOR UPDATE
-TO anon
-USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'profiles' 
+    AND policyname = 'Allow anon update profiles'
+  ) THEN
+    CREATE POLICY "Allow anon update profiles"
+    ON public.profiles
+    FOR UPDATE
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
--- Customers (read/write - Edge Functions validate LINE token)
-CREATE POLICY IF NOT EXISTS "Allow anon read customers"
-ON customers
-FOR SELECT
-TO anon
-USING (true);
+-- Customers (read/write)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'customers' 
+    AND policyname = 'Allow anon read customers'
+  ) THEN
+    CREATE POLICY "Allow anon read customers"
+    ON public.customers
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon insert customers"
-ON customers
-FOR INSERT
-TO anon
-WITH CHECK (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'customers' 
+    AND policyname = 'Allow anon insert customers'
+  ) THEN
+    CREATE POLICY "Allow anon insert customers"
+    ON public.customers
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon update customers"
-ON customers
-FOR UPDATE
-TO anon
-USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'customers' 
+    AND policyname = 'Allow anon update customers'
+  ) THEN
+    CREATE POLICY "Allow anon update customers"
+    ON public.customers
+    FOR UPDATE
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
--- Bookings (read/write - Edge Functions validate LINE token)
-CREATE POLICY IF NOT EXISTS "Allow anon read bookings"
-ON bookings
-FOR SELECT
-TO anon
-USING (true);
+-- Bookings (read/write)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'bookings' 
+    AND policyname = 'Allow anon read bookings'
+  ) THEN
+    CREATE POLICY "Allow anon read bookings"
+    ON public.bookings
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon insert bookings"
-ON bookings
-FOR INSERT
-TO anon
-WITH CHECK (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'bookings' 
+    AND policyname = 'Allow anon insert bookings'
+  ) THEN
+    CREATE POLICY "Allow anon insert bookings"
+    ON public.bookings
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
+  END IF;
+END $$;
 
--- Holds (read/write - Edge Functions validate LINE token)
-CREATE POLICY IF NOT EXISTS "Allow anon read holds"
-ON holds
-FOR SELECT
-TO anon
-USING (true);
+-- Holds (read/write/delete)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'holds' 
+    AND policyname = 'Allow anon read holds'
+  ) THEN
+    CREATE POLICY "Allow anon read holds"
+    ON public.holds
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon insert holds"
-ON holds
-FOR INSERT
-TO anon
-WITH CHECK (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'holds' 
+    AND policyname = 'Allow anon insert holds'
+  ) THEN
+    CREATE POLICY "Allow anon insert holds"
+    ON public.holds
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon update holds"
-ON holds
-FOR UPDATE
-TO anon
-USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'holds' 
+    AND policyname = 'Allow anon update holds'
+  ) THEN
+    CREATE POLICY "Allow anon update holds"
+    ON public.holds
+    FOR UPDATE
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon delete holds"
-ON holds
-FOR DELETE
-TO anon
-USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'holds' 
+    AND policyname = 'Allow anon delete holds'
+  ) THEN
+    CREATE POLICY "Allow anon delete holds"
+    ON public.holds
+    FOR DELETE
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
--- Payments (read/write - Edge Functions validate LINE token)
-CREATE POLICY IF NOT EXISTS "Allow anon read payments"
-ON payments
-FOR SELECT
-TO anon
-USING (true);
+-- Payments (read/write)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'payments' 
+    AND policyname = 'Allow anon read payments'
+  ) THEN
+    CREATE POLICY "Allow anon read payments"
+    ON public.payments
+    FOR SELECT
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon insert payments"
-ON payments
-FOR INSERT
-TO anon
-WITH CHECK (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'payments' 
+    AND policyname = 'Allow anon insert payments'
+  ) THEN
+    CREATE POLICY "Allow anon insert payments"
+    ON public.payments
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS "Allow anon update payments"
-ON payments
-FOR UPDATE
-TO anon
-USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'payments' 
+    AND policyname = 'Allow anon update payments'
+  ) THEN
+    CREATE POLICY "Allow anon update payments"
+    ON public.payments
+    FOR UPDATE
+    TO anon
+    USING (true);
+  END IF;
+END $$;
 
--- Staff working hours (if used for availability)
-CREATE POLICY IF NOT EXISTS "Allow anon read staff_working_hours"
-ON staff_working_hours
-FOR SELECT
-TO anon
-USING (true);
+-- Staff working hours (if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'staff_working_hours') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies 
+      WHERE schemaname = 'public' 
+      AND tablename = 'staff_working_hours' 
+      AND policyname = 'Allow anon read staff_working_hours'
+    ) THEN
+      CREATE POLICY "Allow anon read staff_working_hours"
+      ON public.staff_working_hours
+      FOR SELECT
+      TO anon
+      USING (true);
+    END IF;
+  END IF;
+END $$;
 
--- Staff time off (if used for availability)
-CREATE POLICY IF NOT EXISTS "Allow anon read staff_time_off"
-ON staff_time_off
-FOR SELECT
-TO anon
-USING (true);
+-- Staff time off (if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'staff_time_off') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies 
+      WHERE schemaname = 'public' 
+      AND tablename = 'staff_time_off' 
+      AND policyname = 'Allow anon read staff_time_off'
+    ) THEN
+      CREATE POLICY "Allow anon read staff_time_off"
+      ON public.staff_time_off
+      FOR SELECT
+      TO anon
+      USING (true);
+    END IF;
+  END IF;
+END $$;
 
--- Note: These policies are permissive for testing.
--- For production, switch Edge Functions to use SERVICE_ROLE_KEY instead.
+-- Success message
+SELECT 'RLS policies created successfully!' as status;
